@@ -180,7 +180,7 @@ def process_system_profile_spec():
 
 
 def create_app(runtime_environment):
-    connexion_options = {"swagger_ui_options": True, "uri_parser_class": customURIParser}
+    connexion_options = {"uri_parser_class": customURIParser}
     # This feels like a hack but it is needed.  The logging configuration
     # needs to be setup before the flask app is initialized.
     configure_logging()
@@ -188,7 +188,7 @@ def create_app(runtime_environment):
     app_config = Config(runtime_environment)
     app_config.log_configuration()
 
-    connexion_app = connexion.App("inventory", specification_dir="./swagger/", **connexion_options)
+    connexion_app = connexion.FlaskApp(__name__, specification_dir="./swagger/", **connexion_options)
 
     parser = TranslatingParser(SPECIFICATION_FILE, backend="openapi-spec-validator")
     parser.parse()
@@ -207,6 +207,7 @@ def create_app(runtime_environment):
                 validator_map=build_validator_map(system_profile_spec=sp_spec, unindexed_fields=unindexed_fields),
             )
             logger.info("Listening on API: %s", api_url)
+            logger.info(f"url_map={connexion_app.app.url_map}")
 
     # Add an error handler that will convert our top level exceptions
     # into error responses

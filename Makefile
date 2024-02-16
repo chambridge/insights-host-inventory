@@ -7,7 +7,7 @@ test:
 	pytest --cov=.
 
 upgrade_db:
-	SQLALCHEMY_ENGINE_LOG_LEVEL=INFO python3 manage.py db upgrade
+	SQLALCHEMY_ENGINE_LOG_LEVEL=INFO FLASK_APP=manage.py flask db upgrade
 
 run_inv_web_service:
 	# Set the "KAFKA_TOPIC", "KAFKA_GROUP", "KAFKA_BOOTSTRAP_SERVERS" environment variables
@@ -18,7 +18,7 @@ run_inv_web_service:
 	INVENTORY_LOG_LEVEL=DEBUG BYPASS_RBAC=true BYPASS_TENANT_TRANSLATION=true gunicorn -b :8080 run
 
 run_inv_mq_service:
-	KAFKA_EVENT_TOPIC=platform.inventory.events PAYLOAD_TRACKER_SERVICE_NAME=inventory-mq-service INVENTORY_LOG_LEVEL=DEBUG BYPASS_TENANT_TRANSLATION=true python3 inv_mq_service.py
+	KAFKA_EVENT_TOPIC=platform.inventory.events PAYLOAD_TRACKER_SERVICE_NAME=inventory-mq-service INVENTORY_LOG_LEVEL=DEBUG BYPASS_TENANT_TRANSLATION=true FLASK_APP=inv_mq_service.py flask run
 
 run_inv_mq_service_test_producer:
 	python3 utils/kafka_producer.py
