@@ -5,18 +5,15 @@ from os.path import join
 import connexion
 import segment.analytics as analytics
 import yaml
-from connexion.resolver import RestyResolver
 from flask import current_app
 from flask import jsonify
 from flask import request
-from prance import _TranslatingParser as TranslatingParser
 from prometheus_flask_exporter.multiprocess import GunicornPrometheusMetrics
 
 from api.mgmt import monitoring_blueprint
 from api.parsing import customURIParser
 from app import payload_tracker
 from app.config import Config
-from app.custom_validator import build_validator_map
 from app.exceptions import InventoryException
 from app.logging import configure_logging
 from app.logging import get_logger
@@ -179,42 +176,27 @@ def process_system_profile_spec():
         return process_spec(yaml.safe_load(fp)["$defs"]["SystemProfile"]["properties"])
 
 
-def create_app(runtime_environment):
-    connexion_options = {"uri_parser_class": customURIParser}
+def create_app(runtime_environment, connexion_app=None):
     # This feels like a hack but it is needed.  The logging configuration
     # needs to be setup before the flask app is initialized.
     configure_logging()
 
     app_config = Config(runtime_environment)
     app_config.log_configuration()
-
-    connexion_app = connexion.FlaskApp(__name__, specification_dir="./swagger/", **connexion_options)
-
-    parser = TranslatingParser(SPECIFICATION_FILE, backend="openapi-spec-validator")
-    parser.parse()
+    options = connexion.options.SwaggerUIOptions(
+        swagger_ui_path="/ui", swagger_ui=True, serve_spec=True, spec_path="openapi.json"
+    )
+    if not connexion_app:
+        connexion_app = connexion.FlaskApp(
+            "inventory", uri_parser_class=customURIParser, swagger_ui_options=options, specification_dir="./swagger/"
+        )
 
     sp_spec, unindexed_fields = process_system_profile_spec()
-
-    for api_url in app_config.api_urls:
-        if api_url:
-            connexion_app.add_api(
-                parser.specification,
-                arguments={"title": "RestyResolver Example"},
-                resolver=RestyResolver("api"),
-                validate_responses=True,
-                strict_validation=True,
-                base_path=api_url,
-                validator_map=build_validator_map(system_profile_spec=sp_spec, unindexed_fields=unindexed_fields),
-            )
-            logger.info("Listening on API: %s", api_url)
-            logger.info(f"url_map={connexion_app.app.url_map}")
 
     # Add an error handler that will convert our top level exceptions
     # into error responses
     connexion_app.add_error_handler(InventoryException, render_exception)
-
     flask_app = connexion_app.app
-
     flask_app.config["SQLALCHEMY_ECHO"] = False
     flask_app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     flask_app.config["SQLALCHEMY_DATABASE_URI"] = app_config.db_uri
